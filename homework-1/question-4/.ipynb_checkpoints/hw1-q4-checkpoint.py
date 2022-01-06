@@ -74,11 +74,6 @@ class FeedforwardNetwork(nn.Module):
         """
         super().__init__()
         # Implement me!
-        self.fc1 = nn.Linear(n_features, hidden_size)
-        self.activation = nn.ReLU() if activation_type == 'relu' else nn.Tanh()
-        self.dropout = nn.Dropout(p=dropout)
-        self.fc2 = nn.Linear(hidden_size, n_classes)
-
 
     def forward(self, x, **kwargs):
         """
@@ -88,12 +83,7 @@ class FeedforwardNetwork(nn.Module):
         the output logits from x. This will include using various hidden
         layers, pointwise nonlinear functions, and dropout.
         """
-        x = self.fc1(x)
-        x = self.dropout(x)
-        x = self.activation(x)
-        y = self.fc2(x)
-
-        return y
+        raise NotImplementedError
 
 
 def train_batch(X, y, model, optimizer, criterion, **kwargs):
@@ -151,92 +141,6 @@ def plot(epochs, plottable, ylabel='', name=''):
     plt.plot(epochs, plottable)
     plt.savefig('%s.pdf' % (name), bbox_inches='tight')
 
-def define_and_train_model():
-    model = FeedforwardNetwork(
-        n_classes, n_feats,
-        opt.hidden_sizes, opt.layers,
-        opt.activation, opt.dropout)
-
-    optims = {"adam": torch.optim.Adam, "sgd": torch.optim.SGD}
-
-    optim_cls = optims[opt.optimizer]
-    optimizer = optim_cls(
-        model.parameters(),
-        lr=opt.learning_rate,
-        weight_decay=opt.l2_decay)
-
-    epochs = torch.arange(1, opt.epochs + 1)
-    train_mean_losses = []
-    valid_accs = []
-    train_losses = []
-    for ii in epochs:
-        print('Training epoch {}'.format(ii))
-        for X_batch, y_batch in train_dataloader:
-            loss = train_batch(
-                X_batch, y_batch, model, optimizer, criterion)
-            train_losses.append(loss)
-
-        mean_loss = torch.tensor(train_losses).mean().item()
-        print('Training loss: %.4f' % (mean_loss))
-
-        train_mean_losses.append(mean_loss)
-        valid_accs.append(evaluate(model, dev_X, dev_y))
-        print('Valid acc: %.4f' % (valid_accs[-1]))
-
-        final_test_acc = evaluate(model, test_X, test_y)
-
-    return final_test_acc
-
-def tune_hyperparameters():
-    possible_lr = [0.001, 0.01, 0.1]
-    possible_hidden_size = [100, 200]
-    possible_dropout = [0.3, 0.5]
-    possible_activation = ['relu', 'tanh']
-    possible_optimizer = ['sgd', 'adam']
-
-    # training loop
-    epochs = torch.arange(1, opt.epochs + 1)
-    train_mean_losses = []
-    valid_accs = []
-    train_losses = []
-
-    acc_lr = []
-    for lr in possible_lr:
-        opt.learning_rate = lr
-        test_acc = define_and_train_model(opt, len(possible_lr))
-        acc_lr.append(test_acc)
-    best_lr = possible_lr[acc_lr.index(max(acc_lr))]
-
-    acc_hidden_size = []
-    for hidden_size in possible_hidden_size:
-        opt.hidden_size = hidden_size
-        test_acc = define_and_train_model(opt, len(possible_hidden_size))
-        acc_lr.append(test_acc)
-    best_hidden_size = possible_hidden_size[acc_hidden_size.index(max(acc_hidden_size))]
-
-    acc_dropout = []
-    for dropout in possible_dropout:
-        opt.dropout = dropout
-        test_acc = define_and_train_model(opt, len(possible_dropout))
-        acc_dropout.append(test_acc)
-    best_dropout = possible_dropout[acc_dropout.index(max(acc_dropout))]
-
-    acc_activation = []
-    for activation in possible_activation:
-        opt.activation = activation
-        test_acc = define_and_train_model(opt, len(possible_activation))
-        acc_activation.append(test_acc)
-    best_activation = possible_activation[acc_activation.index(max(acc_activation))]
-
-    acc_optimizer = []
-    for optimizer in possible_optimizer:
-        opt.optimizer = optimizer
-        test_optimizer = define_and_train_model(opt, len(possible_optimizer))
-        acc_optimizer.append(test_a)
-    best_optimizer = possible_optimizer[acc_optimizer.index(max(acc_optimizer))]
-
-
-
 
 def main():
     parser = argparse.ArgumentParser()
@@ -272,9 +176,6 @@ def main():
 
     n_classes = torch.unique(dataset.y).shape[0]  # 10
     n_feats = dataset.X.shape[1]
-
-    opt.n_classes = n_classes
-    opt.n_feats = n_feats
 
     # initialize the model
     if opt.model == 'logistic_regression':
