@@ -94,7 +94,6 @@ class FeedforwardNetwork(nn.Module):
         x = self.dropout(x)
         x = self.activation(x)
         for _ in range(self.extra_layers):
-            print("adding extra layer")
             x = self.fc_hidden(x)
             x = self.dropout(x)
             x = self.activation(x)
@@ -159,82 +158,30 @@ def plot(epochs, plottable, ylabel='', name=''):
     plt.savefig('%s.pdf' % (name), bbox_inches='tight')
 
 
-def tune_hyperparameters(dataset, opt, model):
-    possible_lr = [0.001, 0.01, 0.1]
-    possible_hidden_size = [100, 200]
-    possible_dropout = [0.3, 0.5]
-    possible_activation = ['relu', 'tanh']
-    possible_optimizer = ['sgd', 'adam']
+def tune_hyperparameters(dataset, opt, model, parameter, possible_hyperparameters):
 
-    default_hyperparameters = {'lr': opt.learning_rate,
-                            'hidden_size': opt.hidden_sizes,
-                            'dropout': opt.dropout,
-                            'activation': opt.activation,
-                            'optimizer': opt.optimizer}
-    print(default_hyperparameters)
+    acc_parameter = []
+    print(f"Tuning {parameter}...\n")
+    for index, curr_parameter in enumerate(possible_hyperparameters[parameter]):
+        print(f"Loop {index+1}/{len(possible_hyperparameters[parameter])}")
+        print(curr_parameter)
+        if parameter == 'lr':
+            opt.learning_rate = curr_parameter
+        elif parameter == 'hidden_size':
+            opt.hidden_sizes = curr_parameter
+        elif parameter == 'dropout':
+            opt.dropout = curr_parameter
+        elif parameter == 'activation':
+            opt.activation = curr_parameter
+        elif parameter == 'optimizer':
+            opt.optimizer = curr_parameter
 
-    acc_lr = []
-    print("Tuning learning rate...\n")
-    for index, lr in enumerate(possible_lr):
-        print(f"Loop {index+1}/{len(possible_lr)}")
-        opt.learning_rate = lr
         test_acc = train_model(dataset, opt, model)
-        acc_lr.append(test_acc)
-    best_lr = possible_lr[acc_lr.index(max(acc_lr))]
-    print(f"Best learning rate: {best_lr} with an acc of {max(acc_lr)}")
-    opt.learning_rate = default_hyperparameters['lr']
+        acc_parameter.append(test_acc)
+    best_parameter = possible_hyperparameters[parameter][acc_parameter.index(max(acc_parameter))]
+    print(f"Best {parameter}: {best_parameter} with an acc of {max(acc_parameter)}")
 
-    acc_hidden_size = []
-    print("Tuning hidden size...\n")
-    for index, hidden_size in enumerate(possible_hidden_size):
-        print(f"Loop {index+1}/{len(possible_hidden_size)}")
-        opt.hidden_size = hidden_size
-        test_acc = train_model(dataset, opt, model)
-        acc_hidden_size.append(test_acc)
-    best_hidden_size = possible_hidden_size[acc_hidden_size.index(max(acc_hidden_size))]
-    print(f"Best hidden size: {best_hidden_size} with an acc of {max(acc_hidden_size)}")
-    opt.hidden_sizes = default_hyperparameters['hidden_size']
-
-    acc_dropout = []
-    print("Tuning dropout...\n")
-    for index, dropout in enumerate(possible_dropout):
-        print(f"Loop {index+1}/{len(possible_dropout)}")
-        opt.dropout = dropout
-        test_acc = train_model(dataset, opt, model)
-        acc_dropout.append(test_acc)
-    best_dropout = possible_dropout[acc_dropout.index(max(acc_dropout))]
-    print(f"Best dropout: {best_dropout} with an acc of {max(acc_dropout)}")
-    opt.dropout = default_hyperparameters['dropout']
-
-    acc_activation = []
-    print("Tuning activation...\n")
-    for index, activation in enumerate(possible_activation):
-        print(f"Loop {index+1}/{len(possible_activation)}")
-        opt.activation = activation
-        test_acc = train_model(dataset, opt, model)
-        acc_activation.append(test_acc)
-    best_activation = possible_activation[acc_activation.index(max(acc_activation))]
-    print(f"Best activation: {best_activation} with an acc of {max(acc_activation)}")
-    opt.activation = default_hyperparameters['activation']
-
-    acc_optimizer = []
-    print("Tuning optimizer...\n")
-    for index, optimizer in enumerate(possible_optimizer):
-        print(f"Loop {index+1}/{len(possible_optimizer)}")
-        opt.optimizer = optimizer
-        test_acc = train_model(dataset, opt, model)
-        acc_optimizer.append(test_acc)
-    best_optimizer = possible_optimizer[acc_optimizer.index(max(acc_optimizer))]
-    print(f"Best optimizer: {best_optimizer} with an acc of {max(acc_optimizer)}")
-    opt.optimizer = default_hyperparameters['optimizer']
-
-    best_hyperparameters = {'lr': best_lr,
-                            'hidden_size': best_hidden_size,
-                            'dropout': best_dropout,
-                            'activation': best_activation,
-                            'optimizer': best_optimizer}
-
-    return best_hyperparameters
+    return best_parameter
 
 def train_model(dataset, opt, model):
     train_dataloader = DataLoader(
@@ -279,7 +226,7 @@ def train_model(dataset, opt, model):
     #plot(epochs, valid_accs, ylabel='Accuracy', name='validation-accuracy')
 
     final_test_acc = evaluate(model, test_X, test_y)
-    print('Final Test acc: %.4f' % (final_test_acc))
+    print('Final Test acc: %.4f\n' % (final_test_acc))
 
     return final_test_acc
 
@@ -302,6 +249,10 @@ def main():
                         choices=['tanh', 'relu'], default='relu')
     parser.add_argument('-optimizer',
                         choices=['sgd', 'adam'], default='sgd')
+    parser.add_argument('-tune',
+                        choices=['yes', 'no'], default='no')
+    # Added by me
+
     opt = parser.parse_args()
 
     utils.configure_seed(seed=42)
@@ -312,18 +263,36 @@ def main():
     n_classes = torch.unique(dataset.y).shape[0]  # 10
     n_feats = dataset.X.shape[1]
 
+    possible_hyperparameters = {'lr': [0.001, 0.01, 0.1],
+                                'hidden_size': [100, 200],
+                                'dropout': [0.3, 0.5],
+                                'activation': ['relu', 'tanh'],
+                                'optimizer': ['sgd', 'adam']
+                                }
+
     if opt.model == 'logistic_regression':
-        model = LogisticRegression(n_classes, n_feats)
         print("Training Logistic regression ...\n")
+        model = LogisticRegression(n_classes, n_feats)
+
+        if opt.tune == 'yes':
+            opt.learning_rate = tune_hyperparameters(dataset, opt, model, 'lr', possible_hyperparameters)
+
         _ = train_model(dataset, opt, model)
     else:
+        print("Training Feed Forward Network...\n")
         model = FeedforwardNetwork(
             n_classes, n_feats,
             opt.hidden_sizes, opt.layers,
             opt.activation, opt.dropout)
-        print("Training Feed Forward Network...\n")
-        best_hyperparameters = tune_hyperparameters(dataset, opt, model)
-        print(best_hyperparameters)
+
+        if opt.tune == 'yes':
+            opt.learning_rate = tune_hyperparameters(dataset, opt, model, 'lr', possible_hyperparameters)
+            opt.hidden_sizes = tune_hyperparameters(dataset, opt, model, 'hidden_size', possible_hyperparameters)
+            opt.dropout = tune_hyperparameters(dataset, opt, model, 'dropout', possible_hyperparameters)
+            opt.activation = tune_hyperparameters(dataset, opt, model, 'activation', possible_hyperparameters)
+            opt.optimizer = tune_hyperparameters(dataset, opt, model, 'optimizer', possible_hyperparameters)
+
+        _ = train_model(dataset, opt, model)
 
 
 if __name__ == '__main__':
