@@ -158,7 +158,7 @@ def plot(epochs, plottable, ylabel='', name=''):
     plt.savefig('%s.pdf' % (name), bbox_inches='tight')
 
 
-def tune_hyperparameters(dataset, opt, model, parameter, possible_hyperparameters):
+def tune_hyperparameters(dataset, opt, n_classes, n_feats, parameter, possible_hyperparameters, is_logistic):
 
     acc_parameter = []
     print(f"Tuning {parameter}...\n")
@@ -176,14 +176,22 @@ def tune_hyperparameters(dataset, opt, model, parameter, possible_hyperparameter
         elif parameter == 'optimizer':
             opt.optimizer = curr_parameter
 
-        test_acc = train_model(dataset, opt, model)
+        test_acc = train_model(dataset, opt, n_classes, n_feats, False, is_logistic)
         acc_parameter.append(test_acc)
     best_parameter = possible_hyperparameters[parameter][acc_parameter.index(max(acc_parameter))]
     print(f"Best {parameter}: {best_parameter} with an acc of {max(acc_parameter)}")
 
     return best_parameter
 
-def train_model(dataset, opt, model):
+def train_model(dataset, opt, n_classes, n_feats, make_plot, is_logistic):
+    if (is_logistic):
+        model = LogisticRegression(n_classes, n_feats)
+    else:
+        model = FeedforwardNetwork(
+            n_classes, n_feats,
+            opt.hidden_sizes, opt.layers,
+            opt.activation, opt.dropout)
+
     train_dataloader = DataLoader(
         dataset, batch_size=opt.batch_size, shuffle=True)
 
@@ -200,6 +208,7 @@ def train_model(dataset, opt, model):
         weight_decay=opt.l2_decay)
 
     criterion = nn.CrossEntropyLoss()
+
 
 
     epochs = torch.arange(1, opt.epochs + 1)
@@ -222,11 +231,12 @@ def train_model(dataset, opt, model):
         print('Valid acc: %.4f' % (valid_accs[-1]))
 
 
-    #plot(epochs, train_mean_losses, ylabel='Loss', name='training-loss')
-    #plot(epochs, valid_accs, ylabel='Accuracy', name='validation-accuracy')
-
     final_test_acc = evaluate(model, test_X, test_y)
     print('Final Test acc: %.4f\n' % (final_test_acc))
+
+    if make_plot:
+        plot(epochs, train_mean_losses, ylabel='Loss', name='training-loss')
+        plot(epochs, valid_accs, ylabel='Accuracy', name='validation-accuracy')
 
     return final_test_acc
 
@@ -272,27 +282,29 @@ def main():
 
     if opt.model == 'logistic_regression':
         print("Training Logistic regression ...\n")
-        model = LogisticRegression(n_classes, n_feats)
 
         if opt.tune == 'yes':
-            opt.learning_rate = tune_hyperparameters(dataset, opt, model, 'lr', possible_hyperparameters)
+            opt.learning_rate = tune_hyperparameters(dataset, opt, n_classes, n_feats, 'lr', possible_hyperparameters, True)
 
-        _ = train_model(dataset, opt, model)
+
+        _ = train_model(dataset, opt, n_classes, n_feats, True, True)
     else:
         print("Training Feed Forward Network...\n")
-        model = FeedforwardNetwork(
-            n_classes, n_feats,
-            opt.hidden_sizes, opt.layers,
-            opt.activation, opt.dropout)
 
         if opt.tune == 'yes':
-            opt.learning_rate = tune_hyperparameters(dataset, opt, model, 'lr', possible_hyperparameters)
-            opt.hidden_sizes = tune_hyperparameters(dataset, opt, model, 'hidden_size', possible_hyperparameters)
-            opt.dropout = tune_hyperparameters(dataset, opt, model, 'dropout', possible_hyperparameters)
-            opt.activation = tune_hyperparameters(dataset, opt, model, 'activation', possible_hyperparameters)
-            opt.optimizer = tune_hyperparameters(dataset, opt, model, 'optimizer', possible_hyperparameters)
+            best_lr = tune_hyperparameters(dataset, opt, n_classes, n_feats, 'lr', possible_hyperparameters, False)
+            best_hidden_size = tune_hyperparameters(dataset, opt, n_classes, n_feats, 'hidden_size', possible_hyperparameters, False)
+            best_dropout = tune_hyperparameters(dataset, opt, n_classes, n_feats, 'dropout', possible_hyperparameters, False)
+            best_activation = tune_hyperparameters(dataset, opt, n_classes, n_feats, 'activation', possible_hyperparameters, False)
+            best_optimizer = tune_hyperparameters(dataset, opt, n_classes, n_feats, 'optimizer', possible_hyperparameters, False)
 
-        _ = train_model(dataset, opt, model)
+            opt.learning_rate = best_lr
+            opt.hidden_sizes = best_hidden_size
+            opt.dropout = best_dropout
+            opt.activation = best_activation
+            opt.optimizer = best_optimizer
+
+        _ = train_model(dataset, opt, n_classes, n_feats, True, False)
 
 
 if __name__ == '__main__':

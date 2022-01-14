@@ -1,0 +1,16 @@
+4.1
+Best learning rate: 0.001
+Final accuracy on test set: 0.8403
+
+4.2
+Best learning rate: 0.001
+Best hidden size: 100
+Best dropout: 0.3
+Best activation: tanh
+Best optimizer: sgd
+Final accuracy on test set: 0.8610
+
+4.3
+
+2 layers: final test acc: 0.8680
+3 layers: final test acc: 0.8602
